@@ -17,6 +17,8 @@ export function Cart({ ctx }) {
   const [paying, setPaying] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [auto, setAuto] = useState({ status: 'idle', msg: '' })
+  const [autoKm, setAutoKm] = useState(false)
 
   if (!lines.length) {
     return (
@@ -38,7 +40,35 @@ export function Cart({ ctx }) {
   let d = { ok: true, cost: 0, text: 'Самовывоз — бесплатно' }
   if (!pickup) {
     if (!address.trim()) d = { ok: false, cost: 0, text: 'Укажите адрес доставки' }
+    else if (String(km).trim() === '')
+      d = { ok: false, cost: 0, text: 'Нажмите «Рассчитать расстояние» или введите километры вручную' }
     else d = calcDelivery(settings, { km, subtotal, weight })
+  }
+
+  const calc = async () => {
+    if (auto.status === 'loading') return
+    if (address.trim().length < 5) {
+      setAuto({ status: 'error', msg: 'Введите адрес полностью: город, улица, дом' })
+      return
+    }
+    setAuto({ status: 'loading', msg: '' })
+    try {
+      const r = await api.calcDistance(settings.address, address.trim())
+      setKm(String(r.km))
+      setAutoKm(true)
+      setAuto({ status: 'ok', msg: 'Маршрут по дорогам: ' + r.km + ' км' })
+    } catch (e) {
+      setAuto({ status: 'error', msg: e.message })
+    }
+  }
+
+  const onAddress = (v) => {
+    setAddress(v)
+    setAuto({ status: 'idle', msg: '' })
+    if (autoKm) {
+      setKm('')
+      setAutoKm(false)
+    }
   }
   const total = subtotal + (d.ok ? d.cost : 0)
 
@@ -146,10 +176,23 @@ export function Cart({ ctx }) {
                   Адрес доставки
                   <input
                     value={address}
-                    onChange={(e) => setAddress(e.target.value)}
+                    onChange={(e) => onAddress(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') calc()
+                    }}
                     placeholder="Город, улица, дом"
+                    autoComplete="street-address"
                   />
                 </label>
+                <button
+                  type="button"
+                  className="btn btn-line"
+                  disabled={auto.status === 'loading'}
+                  onClick={calc}
+                >
+                  {auto.status === 'loading' ? 'СЧИТАЕМ МАРШРУТ…' : 'РАССЧИТАТЬ РАССТОЯНИЕ'}
+                </button>
+                {auto.msg && <div className={'note ' + (auto.status === 'ok' ? 'okc' : 'bad')}>{auto.msg}</div>}
                 <label>
                   Расстояние от склада, км
                   <input
@@ -157,18 +200,19 @@ export function Cart({ ctx }) {
                     min="0"
                     step="0.1"
                     value={km}
-                    onChange={(e) => setKm(e.target.value)}
-                    placeholder="Например, 12"
+                    onChange={(e) => {
+                      setKm(e.target.value)
+                      setAutoKm(false)
+                    }}
+                    placeholder="Заполнится автоматически"
                   />
                 </label>
-                <a
-                  className="mono small"
-                  href={routeLink(settings.address, address)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  → УЗНАТЬ РАССТОЯНИЕ НА ЯНДЕКС.КАРТАХ
-                </a>
+                <span className="muted small">
+                  Склад: {settings.address}.{' '}
+                  <a href={routeLink(settings.address, address)} target="_blank" rel="noopener noreferrer">
+                    Посмотреть маршрут на Яндекс.Картах
+                  </a>
+                </span>
                 <div className={'note ' + (d.ok ? 'okc' : 'bad')}>{d.text}</div>
               </div>
             )}
