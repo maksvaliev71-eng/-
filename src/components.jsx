@@ -5,6 +5,31 @@ export function Stripe() {
   return <div className="stripe" />
 }
 
+export function LogoMark({ size = 46 }) {
+  return (
+    <svg
+      width={size}
+      height={Math.round((size * 590) / 626)}
+      viewBox="314 278 626 590"
+      aria-hidden="true"
+      style={{ flex: 'none', display: 'block' }}
+    >
+      <g style={{ fill: 'var(--accent)' }}>
+        <path d="M314 278H592V332H369V814H592V868H314Z" />
+        <path d="M667 278H940V538H885V332H667Z" />
+        <path d="M885 623H940V868H667V814H885Z" />
+        <path d="M668 357L842 457V517L668 430L520 515V665L540 676H838V763H518L432 712V477Z" />
+      </g>
+      <g fill="#EDEDED">
+        <rect x="648" y="483" width="42" height="43" />
+        <rect x="706" y="483" width="42" height="43" />
+        <rect x="648" y="542" width="42" height="43" />
+        <rect x="706" y="542" width="42" height="43" />
+      </g>
+    </svg>
+  )
+}
+
 export function Header({ settings, count }) {
   const [q, setQ] = useState('')
   const submit = (e) => {
@@ -18,7 +43,7 @@ export function Header({ settings, count }) {
       <header className="hdr">
         <div className="wrap hdr-in">
           <a href="#/" className="logo">
-            <span className="logo-mark">{name.slice(0, 1).toUpperCase()}</span>
+            <LogoMark />
             <span>
               <span className="logo-name">{name.toUpperCase()}</span>
               <span className="logo-sub">{(settings.tagline || '').toUpperCase()}</span>
