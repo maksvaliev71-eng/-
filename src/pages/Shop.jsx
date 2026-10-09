@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ProductCard, Qty } from '../components.jsx'
+import * as api from '../api'
 import { fmt, rub, calcDelivery } from '../data.js'
 
 export function Home({ ctx }) {
@@ -218,15 +219,34 @@ export function ProductPage({ ctx, id }) {
 }
 
 export function DeliveryPage({ ctx }) {
-  const { settings } = ctx
+  const { settings, cart } = ctx
+  const [address, setAddress] = useState('')
   const [km, setKm] = useState('')
-  const [weight, setWeight] = useState('')
-  const [sum, setSum] = useState('')
-  const d = calcDelivery(settings, {
-    km,
-    subtotal: Number(sum) || 0,
-    weight: Number(weight) || 0,
-  })
+  const [weight, setWeight] = useState(cart.weight ? String(Math.round(cart.weight)) : '')
+  const [sum, setSum] = useState(cart.subtotal ? String(Math.round(cart.subtotal)) : '')
+  const [auto, setAuto] = useState({ status: 'idle', msg: '' })
+
+  const calc = async () => {
+    if (auto.status === 'loading') return
+    if (address.trim().length < 5) {
+      setAuto({ status: 'error', msg: 'Введите адрес полностью: город, улица, дом' })
+      return
+    }
+    setAuto({ status: 'loading', msg: '' })
+    try {
+      const r = await api.calcDistance(settings.address, address.trim())
+      setKm(String(r.km))
+      setAuto({ status: 'ok', msg: 'Маршрут по дорогам: ' + r.km + ' км' })
+    } catch (e) {
+      setAuto({ status: 'error', msg: e.message })
+    }
+  }
+
+  const d =
+    String(km).trim() === ''
+      ? { ok: false, cost: 0, text: 'Введите адрес и нажмите «Рассчитать расстояние»' }
+      : calcDelivery(settings, { km, subtotal: Number(sum) || 0, weight: Number(weight) || 0 })
+
   return (
     <section className="wrap sec">
       <div className="sec-head">
@@ -262,8 +282,39 @@ export function DeliveryPage({ ctx }) {
           <h3 className="panel-h mono">КАЛЬКУЛЯТОР</h3>
           <div className="form">
             <label>
+              Адрес доставки
+              <input
+                value={address}
+                onChange={(e) => {
+                  setAddress(e.target.value)
+                  setKm('')
+                  setAuto({ status: 'idle', msg: '' })
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') calc()
+                }}
+                placeholder="Город, улица, дом"
+              />
+            </label>
+            <button
+              type="button"
+              className="btn btn-line"
+              disabled={auto.status === 'loading'}
+              onClick={calc}
+            >
+              {auto.status === 'loading' ? 'СЧИТАЕМ МАРШРУТ…' : 'РАССЧИТАТЬ РАССТОЯНИЕ'}
+            </button>
+            {auto.msg && <div className={'note ' + (auto.status === 'ok' ? 'okc' : 'bad')}>{auto.msg}</div>}
+            <label>
               Расстояние от склада, км
-              <input type="number" min="0" value={km} onChange={(e) => setKm(e.target.value)} />
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={km}
+                onChange={(e) => setKm(e.target.value)}
+                placeholder="Заполнится автоматически"
+              />
             </label>
             <label>
               Вес груза, кг
