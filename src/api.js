@@ -1,19 +1,18 @@
 import { createClient } from '@supabase/supabase-js'
-import { DEFAULT_SETTINGS, DEMO_PRODUCTS } from './data'
-import type { Product, Settings, Order } from './types'
+import { DEFAULT_SETTINGS, DEMO_PRODUCTS } from './data.js'
 
 // Если переменные окружения не заданы — сайт работает в демо-режиме
 // (данные хранятся в браузере). После подключения Supabase всё идёт в базу.
 const url = import.meta.env.VITE_SUPABASE_URL
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY
-export const sb = url && key ? createClient(url as string, key as string) : null
+export const sb = url && key ? createClient(url, key) : null
 export const isDemo = !sb
 
 const DEMO_PIN = '1234'
 
 /* ---------- локальное хранилище (демо) ---------- */
 const ls = {
-  get(k: string, d: any) {
+  get(k, d) {
     try {
       const v = localStorage.getItem(k)
       return v ? JSON.parse(v) : d
@@ -21,7 +20,7 @@ const ls = {
       return d
     }
   },
-  set(k: string, v: any) {
+  set(k, v) {
     try {
       localStorage.setItem(k, JSON.stringify(v))
     } catch {
@@ -31,7 +30,7 @@ const ls = {
 }
 
 /* ---------- преобразование строк БД ---------- */
-const fromRow = (r: any): Product => ({
+const fromRow = (r) => ({
   id: r.id,
   sku: r.sku || '',
   name: r.name,
@@ -45,8 +44,8 @@ const fromRow = (r: any): Product => ({
   active: r.active !== false,
 })
 
-const toRow = (p: any) => {
-  const o: any = {
+const toRow = (p) => {
+  const o = {
     sku: p.sku || null,
     name: p.name,
     category: p.category || 'Без категории',
@@ -63,7 +62,7 @@ const toRow = (p: any) => {
   return o
 }
 
-const fromOrder = (r: any): Order => ({
+const fromOrder = (r) => ({
   id: r.id,
   code: r.public_code,
   date: r.created_at,
@@ -82,19 +81,19 @@ const fromOrder = (r: any): Order => ({
   status: r.status || 'new',
 })
 
-const fail = (error: { message?: string } | null) => {
+const fail = (error) => {
   if (error) throw new Error(error.message || 'Ошибка базы данных')
 }
 
 /* ---------- каталог ---------- */
-export async function listProducts(): Promise<Product[]> {
+export async function listProducts() {
   if (isDemo) return ls.get('sm_products', DEMO_PRODUCTS)
   const { data, error } = await sb.from('products').select('*').order('category').order('name')
   fail(error)
   return data.map(fromRow)
 }
 
-export async function saveProduct(p: any) {
+export async function saveProduct(p) {
   if (isDemo) {
     const list = ls.get('sm_products', DEMO_PRODUCTS)
     const item = { ...p, id: p.id || 'p' + Date.now() }
@@ -109,7 +108,7 @@ export async function saveProduct(p: any) {
   return fromRow(data)
 }
 
-export async function deleteProduct(id: string) {
+export async function deleteProduct(id) {
   if (isDemo) {
     ls.set('sm_products', ls.get('sm_products', DEMO_PRODUCTS).filter((x) => x.id !== id))
     return
@@ -119,10 +118,10 @@ export async function deleteProduct(id: string) {
 }
 
 // Массовая загрузка из CSV. Товары с артикулом обновляются, без артикула — добавляются.
-export async function importProducts(rows: any[]) {
+export async function importProducts(rows) {
   if (isDemo) {
     const list = ls.get('sm_products', DEMO_PRODUCTS)
-    const bySku = new Map<string, any>(list.filter((x: Product) => x.sku).map((x: Product) => [x.sku, x]))
+    const bySku = new Map(list.filter((x) => x.sku).map((x) => [x.sku, x]))
     const added = []
     rows.forEach((r, i) => {
       const old = r.sku && bySku.get(r.sku)
@@ -146,7 +145,7 @@ export async function importProducts(rows: any[]) {
 }
 
 /* ---------- картинки ---------- */
-function compressImage(file: File, max = 1200): Promise<Blob> {
+function compressImage(file, max = 1200) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onerror = () => reject(new Error('Не удалось прочитать файл'))
@@ -161,21 +160,21 @@ function compressImage(file: File, max = 1200): Promise<Blob> {
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
         c.toBlob((b) => (b ? resolve(b) : reject(new Error('Не удалось сжать картинку'))), 'image/jpeg', 0.82)
       }
-      img.src = reader.result as string
+      img.src = reader.result
     }
     reader.readAsDataURL(file)
   })
 }
 
-const blobToDataUrl = (blob: Blob): Promise<string> =>
+const blobToDataUrl = (blob) =>
   new Promise((resolve, reject) => {
     const r = new FileReader()
-    r.onload = () => resolve(r.result as string)
+    r.onload = () => resolve(r.result)
     r.onerror = () => reject(new Error('Не удалось прочитать картинку'))
     r.readAsDataURL(blob)
   })
 
-export async function uploadImage(file: File): Promise<string> {
+export async function uploadImage(file) {
   const blob = await compressImage(file, isDemo ? 700 : 1200)
   if (isDemo) return blobToDataUrl(blob)
   const path = `${crypto.randomUUID()}.jpg`
@@ -187,7 +186,7 @@ export async function uploadImage(file: File): Promise<string> {
 }
 
 /* ---------- заказы ---------- */
-export async function createOrder(o: Order) {
+export async function createOrder(o) {
   if (isDemo) {
     const list = ls.get('sm_orders', [])
     list.push({ ...o, id: Date.now(), date: new Date().toISOString(), status: 'new' })
@@ -212,19 +211,19 @@ export async function createOrder(o: Order) {
   fail(error)
 }
 
-export async function listOrders(): Promise<Order[]> {
+export async function listOrders() {
   if (isDemo) return ls.get('sm_orders', []).slice().reverse()
   const { data, error } = await sb.from('orders').select('*').order('created_at', { ascending: false })
   fail(error)
   return data.map(fromOrder)
 }
 
-export async function updateOrder(id: number | string | undefined, patch: { status?: string; paid?: boolean }) {
+export async function updateOrder(id, patch) {
   if (isDemo) {
     ls.set('sm_orders', ls.get('sm_orders', []).map((o) => (o.id === id ? { ...o, ...patch } : o)))
     return
   }
-  const row: any = {}
+  const row = {}
   if (patch.status !== undefined) row.status = patch.status
   if (patch.paid !== undefined) row.paid = patch.paid
   const { error } = await sb.from('orders').update(row).eq('id', id)
@@ -232,13 +231,13 @@ export async function updateOrder(id: number | string | undefined, patch: { stat
 }
 
 /* ---------- настройки ---------- */
-export async function getSettings(): Promise<Settings> {
+export async function getSettings() {
   if (isDemo) return { ...DEFAULT_SETTINGS, ...ls.get('sm_settings', {}) }
   const { data } = await sb.from('settings').select('value').eq('key', 'shop').maybeSingle()
   return { ...DEFAULT_SETTINGS, ...(data ? data.value : {}) }
 }
 
-export async function saveSettings(s: Settings) {
+export async function saveSettings(s) {
   if (isDemo) {
     ls.set('sm_settings', s)
     return
@@ -254,7 +253,7 @@ export async function getSession() {
   return !!data.session
 }
 
-export async function signIn(login: string, password: string) {
+export async function signIn(login, password) {
   if (isDemo) {
     if (password !== DEMO_PIN) throw new Error('Неверный PIN (в демо-режиме: 1234)')
     sessionStorage.setItem('sm_admin', '1')
@@ -273,22 +272,6 @@ export async function signOut() {
 }
 
 /* ---------- расстояние доставки ---------- */
-export async function calcDistance(from: string, to: string): Promise<{ km: number; provider?: string }> {
-  let r
-  try {
-    r = await fetch('/api/distance?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to))
-  } catch {
-    throw new Error('Нет связи с сервером. Введите расстояние вручную.')
-  }
-  let j: any = {}
-  try {
-    j = await r.json()
-  } catch {
-    throw new Error('Автоматический расчёт недоступен. Введите расстояние вручную.')
-  }
-  if (!r.ok) throw new Error(j.error || 'Не удалось рассчитать расстояние')
-  return j
-}
 export async function calcDistance(from, to) {
   let r
   try {
