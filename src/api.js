@@ -289,3 +289,19 @@ export async function calcDistance(from: string, to: string): Promise<{ km: numb
   if (!r.ok) throw new Error(j.error || 'Не удалось рассчитать расстояние')
   return j
 }
+export async function calcDistance(from, to) {
+  let r
+  try {
+    r = await fetch('/api/distance?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to))
+  } catch {
+    throw new Error('Нет связи с сервером. Введите расстояние вручную.')
+  }
+  let j = {}
+  try {
+    j = await r.json()
+  } catch {
+    throw new Error('Автоматический расчёт недоступен. Введите расстояние вручную.')
+  }
+  if (!r.ok) throw new Error(j.error || 'Не удалось рассчитать расстояние')
+  return j
+}
